@@ -7,10 +7,8 @@ use std::{
 use adw::subclass::prelude::*;
 use gtk::{
     gdk::RGBA,
-    gio::{
-        self, BusType, DBusCallFlags, DBusProxy, DBusProxyFlags, ListStore, prelude::DBusProxyExt,
-    },
-    glib::{self, Object, clone, prelude::*},
+    gio::{self, BusType, DBusCallFlags, DBusProxy, DBusProxyFlags, ListStore, prelude::*},
+    glib::{self, Object, clone},
 };
 use tracing::{debug, info, warn};
 use tsparql::{Notifier, NotifierEvent, NotifierEventType, SparqlConnection, prelude::*};
@@ -20,13 +18,15 @@ use crate::{Calendar, Collection, Event, Provider, Resource, pre_resource::PreRe
 mod imp {
     use super::*;
 
-    #[derive(Debug, Default)]
+    #[derive(Debug, Default, glib::Properties)]
+    #[properties(wrapper_type = super::Manager)]
     pub struct Manager {
         read_connection: OnceCell<SparqlConnection>,
         write_connection: OnceCell<DBusProxy>,
         notifier: OnceCell<tsparql::Notifier>,
-        resource_pool: OnceCell<Mutex<HashMap<String, Resource>>>,
+        #[property(get)]
         collections: OnceCell<ListStore>,
+        resource_pool: OnceCell<Mutex<HashMap<String, Resource>>>,
         events_handler: RefCell<Option<glib::SignalHandlerId>>,
     }
 
@@ -37,6 +37,7 @@ mod imp {
         type ParentType = Object;
     }
 
+    #[glib::derived_properties]
     impl ObjectImpl for Manager {
         fn constructed(&self) {
             self.parent_constructed();
@@ -106,12 +107,6 @@ mod imp {
             self.notifier.get().expect("notifier should be initialized")
         }
 
-        pub(super) fn collections(&self) -> &ListStore {
-            self.collections
-                .get()
-                .expect("providers should be initialized")
-        }
-
         pub(super) fn resource_pool(&self) -> MutexGuard<'_, HashMap<String, Resource>> {
             self.resource_pool
                 .get()
@@ -150,7 +145,7 @@ mod imp {
                 if maybe_old_resource.is_some() {
                     warn!("Encountered a duplicate URI \"{collection_uri}\"");
                 }
-                self.collections().insert(0, &collection);
+                self.obj().collections().insert(0, &collection);
 
                 info!("Found collection: uri: \"{collection_uri}\", name: \"{collection_name}\"");
 
@@ -409,10 +404,6 @@ glib::wrapper! {
 impl Manager {
     pub fn new() -> Self {
         glib::Object::builder().build()
-    }
-
-    pub fn collections(&self) -> ListStore {
-        self.imp().collections().clone()
     }
 
     pub fn find_resource(&self, uri: &str) -> Option<Resource> {
