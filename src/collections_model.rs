@@ -1,5 +1,6 @@
-use gtk::{gio, glib, prelude::*, subclass::prelude::*};
 use std::cell::RefCell;
+
+use gtk::{gio, glib, prelude::*, subclass::prelude::*};
 
 use super::collection::Collection;
 
@@ -16,7 +17,14 @@ mod imp {
         type Interfaces = (gio::ListModel,);
     }
 
-    impl ObjectImpl for CollectionsModel {}
+    impl ObjectImpl for CollectionsModel {
+        // fn signals() -> &'static [Signal] {
+        //     static SIGNALS: LazyLock<Vec<Signal>> =
+        //         LazyLock::new(|| vec![Signal::builder("inner-items-changed").build()]);
+        //     SIGNALS.as_ref()
+        // }
+    }
+
     impl ListModelImpl for CollectionsModel {
         fn item_type(&self) -> glib::Type {
             Collection::static_type()
@@ -46,6 +54,15 @@ impl CollectionsModel {
             (data.len() - 1) as u32
         };
         self.items_changed(pos, 0, 1);
+
+        // collection.connect_items_changed(clone!(
+        //     #[weak(rename_to = obj)]
+        //     self,
+        //     move |_, _, _, _| {
+        //         let _: () = obj.emit_by_name("inner-items-changed", &[]);
+        //         obj.emit_by_name("items-changed", &[])
+        //     }
+        // ));
     }
 
     pub fn splice(&self, collections: &[Collection]) {
