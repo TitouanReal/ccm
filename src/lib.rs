@@ -1,5 +1,6 @@
 mod calendar;
 mod collection;
+mod collections_model;
 mod event;
 mod manager;
 mod pre_resource;

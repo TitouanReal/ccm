@@ -3,7 +3,7 @@ use std::cell::{OnceCell, RefCell};
 use adw::{prelude::*, subclass::prelude::*};
 use gtk::{
     gdk::RGBA,
-    gio::ListStore,
+    gio::{self, ListStore},
     glib::{self, Object, clone},
 };
 
@@ -30,6 +30,7 @@ mod imp {
         const NAME: &'static str = "Collection";
         type Type = super::Collection;
         type ParentType = Object;
+        type Interfaces = (gio::ListModel,);
     }
 
     #[glib::derived_properties]
@@ -38,6 +39,18 @@ mod imp {
             self.parent_constructed();
 
             self.calendars.get_or_init(ListStore::new::<Calendar>);
+        }
+    }
+
+    impl ListModelImpl for Collection {
+        fn item_type(&self) -> glib::Type {
+            Calendar::static_type()
+        }
+        fn n_items(&self) -> u32 {
+            self.calendars().n_items()
+        }
+        fn item(&self, position: u32) -> Option<glib::Object> {
+            self.calendars().item(position)
         }
     }
 
@@ -51,7 +64,8 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct Collection(ObjectSubclass<imp::Collection>);
+    pub struct Collection(ObjectSubclass<imp::Collection>)
+        @implements gio::ListModel;
 }
 
 impl Collection {

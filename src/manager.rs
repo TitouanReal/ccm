@@ -7,13 +7,16 @@ use std::{
 use adw::subclass::prelude::*;
 use gtk::{
     gdk::RGBA,
-    gio::{self, BusType, DBusCallFlags, DBusProxy, DBusProxyFlags, ListStore, prelude::*},
+    gio::{self, BusType, DBusCallFlags, DBusProxy, DBusProxyFlags, prelude::*},
     glib::{self, Object, clone},
 };
 use tracing::{debug, info, warn};
 use tsparql::{Notifier, NotifierEvent, NotifierEventType, SparqlConnection, prelude::*};
 
-use crate::{Calendar, Collection, Event, Provider, Resource, pre_resource::PreResource, spawn};
+use crate::{
+    Calendar, Collection, Event, Provider, Resource, collections_model::CollectionsModel,
+    pre_resource::PreResource, spawn,
+};
 
 mod imp {
     use super::*;
@@ -25,7 +28,7 @@ mod imp {
         write_connection: OnceCell<DBusProxy>,
         notifier: OnceCell<tsparql::Notifier>,
         #[property(get)]
-        collections: OnceCell<ListStore>,
+        collections_model: OnceCell<CollectionsModel>,
         resource_pool: OnceCell<Mutex<HashMap<String, Resource>>>,
         events_handler: RefCell<Option<glib::SignalHandlerId>>,
     }
@@ -65,7 +68,8 @@ mod imp {
             self.resource_pool
                 .get_or_init(|| Mutex::new(HashMap::new()));
 
-            self.collections.get_or_init(ListStore::new::<Collection>);
+            self.collections_model
+                .get_or_init(CollectionsModel::default);
 
             spawn!(clone!(
                 #[weak(rename_to = imp)]
@@ -145,7 +149,7 @@ mod imp {
                 if maybe_old_resource.is_some() {
                     warn!("Encountered a duplicate URI \"{collection_uri}\"");
                 }
-                self.obj().collections().insert(0, &collection);
+                self.obj().collections_model().append(&collection);
 
                 info!("Found collection: uri: \"{collection_uri}\", name: \"{collection_name}\"");
 
