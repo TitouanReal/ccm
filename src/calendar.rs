@@ -74,6 +74,11 @@ impl Calendar {
             .build()
     }
 
+    pub(crate) fn update(&self, name: &str, color: gdk::RGBA) {
+        self.set_property("name", name);
+        self.set_property("color", Some(color));
+    }
+
     pub(crate) fn add_event(&self, event: &Event) {
         self.imp().events().append(event);
     }

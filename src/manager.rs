@@ -122,11 +122,11 @@ mod imp {
         fn refresh_resources(&self) {
             let collection_cursor = match self.read_connection().query(
                 "SELECT ?collection ?collection_name
-                    FROM ccm:Calendar
-                    WHERE {
-                        ?collection a ccm:Collection;
-                            rdfs:label ?collection_name.
-                    }",
+                FROM ccm:Calendar
+                WHERE {
+                    ?collection a ccm:Collection;
+                        rdfs:label ?collection_name.
+                }",
                 None::<&gio::Cancellable>,
             ) {
                 Ok(cursor) => cursor,
@@ -359,14 +359,34 @@ mod imp {
                     debug!("Handling {num_update_events} \"Update\" events");
                 }
             }
-            let _update_events = updated_uris
+            let update_events = updated_uris
                 .into_iter()
                 .map(|uri| {
                     let old = self.resource_pool().get(uri.as_str()).unwrap().to_owned();
                     let new = PreResource::from_uri(self.read_connection(), &uri).unwrap();
-                    (uri, old, new)
+                    (old, new)
                 })
                 .collect::<Vec<_>>();
+            for update_event in update_events {
+                match update_event {
+                    (Resource::Provider(_old_provider), PreResource::Provider(_new_provider)) => {
+                        todo!()
+                    }
+                    (
+                        Resource::Collection(_old_collection),
+                        PreResource::Collection(_new_collection),
+                    ) => {
+                        todo!()
+                    }
+                    (Resource::Calendar(old_calendar), PreResource::Calendar(new_calendar)) => {
+                        old_calendar.update(&new_calendar.name, new_calendar.color);
+                    }
+                    (Resource::Event(_old_event), PreResource::Event(_new_event)) => {}
+                    _ => {
+                        todo!()
+                    }
+                }
+            }
 
             match deleted_uris.len() {
                 0 => {}
@@ -392,6 +412,7 @@ mod imp {
                     Resource::Event(_event) => todo!(),
                 }
             }
+
             if num_events == 1 {
                 debug!("Finished to handle 1 event");
             } else {
