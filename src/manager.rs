@@ -379,7 +379,7 @@ mod imp {
                         todo!()
                     }
                     (Resource::Calendar(old_calendar), PreResource::Calendar(new_calendar)) => {
-                        old_calendar.update(&new_calendar.name, new_calendar.color);
+                        old_calendar.emit_updated(&new_calendar.name, new_calendar.color);
                     }
                     (Resource::Event(_old_event), PreResource::Event(_new_event)) => {}
                     _ => {
@@ -447,6 +447,34 @@ impl Manager {
                 None::<&gio::Cancellable>,
             )
             .unwrap();
+    }
+
+    pub(crate) fn update_calendar(&self, uri: &str, name: Option<&str>, color: Option<RGBA>) {
+        // TODO: dispatch to relevant provider instead
+        if let Some(name) = name {
+            self.imp()
+                .write_connection()
+                .call_sync(
+                    "UpdateCalendarName",
+                    Some(&(uri, name).to_variant()),
+                    DBusCallFlags::NONE,
+                    -1,
+                    None::<&gio::Cancellable>,
+                )
+                .unwrap();
+        }
+        if let Some(color) = color {
+            self.imp()
+                .write_connection()
+                .call_sync(
+                    "UpdateCalendarColor",
+                    Some(&(uri, color.to_string()).to_variant()),
+                    DBusCallFlags::NONE,
+                    -1,
+                    None::<&gio::Cancellable>,
+                )
+                .unwrap();
+        }
     }
 
     pub(crate) fn delete_calendar(&self, uri: &str) {

@@ -74,13 +74,15 @@ impl Calendar {
             .build()
     }
 
-    pub(crate) fn update(&self, name: &str, color: gdk::RGBA) {
-        self.set_property("name", name);
-        self.set_property("color", Some(color));
+    pub fn update(&self, name: Option<&str>, color: Option<gdk::RGBA>) {
+        // TODO: dispatch to relevant provider instead
+        self.manager().update_calendar(&self.uri(), name, color);
     }
 
-    pub(crate) fn add_event(&self, event: &Event) {
-        self.imp().events().append(event);
+    pub(crate) fn emit_updated(&self, name: &str, color: gdk::RGBA) {
+        // TODO: Manual notification
+        self.set_property("name", name);
+        self.set_property("color", Some(color));
     }
 
     /// Deletes the calendar from the database.
@@ -103,5 +105,9 @@ impl Calendar {
                 f(&obj);
             }),
         )
+    }
+
+    pub(crate) fn add_event(&self, event: &Event) {
+        self.imp().events().append(event);
     }
 }
