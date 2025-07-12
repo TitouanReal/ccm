@@ -116,7 +116,12 @@ impl Calendar {
         )
     }
 
-    pub(crate) fn add_event(&self, event: &Event) {
+    pub fn create_event(&self, name: &str) {
+        // TODO: dispatch to relevant provider instead
+        self.manager().create_event(&self.uri(), name);
+    }
+
+    pub(crate) fn emit_new_event(&self, event: &Event) {
         self.imp().events().append(event);
     }
 }

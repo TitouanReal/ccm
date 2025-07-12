@@ -336,7 +336,7 @@ mod imp {
 
                 if let Some(Resource::Calendar(calendar)) = resource_pool.get(&calendar_uri) {
                     let event = Event::new(&self.obj(), &pre_event.uri, &pre_event.name);
-                    calendar.add_event(&event);
+                    calendar.emit_new_event(&event);
                     resource_pool.insert(event_uri, Resource::Event(event));
 
                     info!(
@@ -482,6 +482,20 @@ impl Manager {
             .call_sync(
                 "DeleteCalendar",
                 Some(&(uri,).to_variant()),
+                DBusCallFlags::NONE,
+                -1,
+                None::<&gio::Cancellable>,
+            )
+            .unwrap();
+    }
+
+    pub(crate) fn create_event(&self, calendar_uri: &str, name: &str) {
+        // TODO: dispatch to relevant provider instead
+        self.imp()
+            .write_connection()
+            .call_sync(
+                "CreateEvent",
+                Some(&(calendar_uri, name).to_variant()),
                 DBusCallFlags::NONE,
                 -1,
                 None::<&gio::Cancellable>,
