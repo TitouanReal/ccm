@@ -360,7 +360,7 @@ mod imp {
             let update_events = updated_uris
                 .into_iter()
                 .map(|uri| {
-                    let old = self.resource_pool().get(uri.as_str()).unwrap().to_owned();
+                    let old = resource_pool.get(uri.as_str()).unwrap().to_owned();
                     let new = PreResource::from_uri(self.read_connection(), &uri).unwrap();
                     (old, new)
                 })
