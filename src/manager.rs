@@ -26,7 +26,7 @@ mod imp {
     pub struct Manager {
         read_connection: OnceCell<SparqlConnection>,
         write_connection: OnceCell<DBusProxy>,
-        notifier: OnceCell<tsparql::Notifier>,
+        notifier: OnceCell<Notifier>,
         #[property(get)]
         collections_model: OnceCell<CollectionsModel>,
         resource_pool: OnceCell<Mutex<HashMap<String, Resource>>>,
@@ -438,7 +438,7 @@ impl Manager {
         self.imp()
             .write_connection()
             .call_sync(
-                "AddCalendar",
+                "CreateCalendar",
                 Some(&(collection_uri, name, &color.to_string()).to_variant()),
                 DBusCallFlags::NONE,
                 -1,
