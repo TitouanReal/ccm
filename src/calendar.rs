@@ -9,6 +9,7 @@ use gtk::{
     gio::ListStore,
     glib::{self, Object, closure_local, subclass::Signal},
 };
+use tracing::info;
 
 use crate::{Event, Manager};
 
@@ -22,10 +23,10 @@ mod imp {
         manager: OnceCell<Manager>,
         #[property(get, construct_only)]
         uri: RefCell<String>,
-        #[property(get, set)]
+        #[property(get, set, explicit_notify)]
         name: RefCell<String>,
         // TODO: Remove the Option
-        #[property(get, set)]
+        #[property(get, set, explicit_notify)]
         color: RefCell<Option<RGBA>>,
         #[property(get)]
         events: OnceCell<ListStore>,
@@ -80,9 +81,17 @@ impl Calendar {
     }
 
     pub(crate) fn emit_updated(&self, name: &str, color: gdk::RGBA) {
-        // TODO: Manual notification
-        self.set_property("name", name);
-        self.set_property("color", Some(color));
+        let uri = self.uri();
+        if name != self.name() {
+            self.set_property("name", name);
+            info!("Calendar {uri} updated to name {name}");
+            self.notify_name();
+        }
+        if color != self.color().unwrap() {
+            self.set_property("color", Some(color));
+            info!("Calendar {uri} updated to color {color}");
+            self.notify_color();
+        }
     }
 
     /// Deletes the calendar from the database.
