@@ -122,7 +122,6 @@ mod imp {
         fn refresh_resources(&self) {
             let collection_cursor = match self.read_connection().query(
                 "SELECT ?collection ?collection_name
-                FROM ccm:Calendar
                 WHERE {
                     ?collection a ccm:Collection;
                         rdfs:label ?collection_name.
@@ -157,7 +156,6 @@ mod imp {
                     .read_connection()
                     .query_statement(
                         "SELECT ?calendar ?calendar_color ?calendar_name
-                        FROM ccm:Calendar
                         WHERE {
                             ?calendar a ccm:Calendar ;
                                 rdfs:label ?calendar_name ;

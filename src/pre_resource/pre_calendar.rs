@@ -20,7 +20,6 @@ impl PreCalendar {
             .query(
                 &format!(
                     "SELECT ?name ?color ?collection
-                    FROM ccm:Calendar
                     WHERE {{
                         \"{uri}\" rdfs:label ?name ;
                             ccm:color ?color ;
