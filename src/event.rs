@@ -1,7 +1,9 @@
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 
 use adw::{prelude::*, subclass::prelude::*};
 use gtk::glib::{self, Object};
+
+use crate::Manager;
 
 mod imp {
     use super::*;
@@ -9,6 +11,10 @@ mod imp {
     #[derive(Debug, Default, glib::Properties)]
     #[properties(wrapper_type = super::Event)]
     pub struct Event {
+        #[property(get, construct_only)]
+        manager: OnceCell<Manager>,
+        #[property(get, construct_only)]
+        uri: OnceCell<String>,
         #[property(get, set)]
         name: RefCell<String>,
     }
@@ -29,7 +35,11 @@ glib::wrapper! {
 }
 
 impl Event {
-    pub(crate) fn new(name: &str) -> Self {
-        glib::Object::builder().property("name", name).build()
+    pub(crate) fn new(manager: &Manager, uri: &str, name: &str) -> Self {
+        glib::Object::builder()
+            .property("manager", manager)
+            .property("uri", uri)
+            .property("name", name)
+            .build()
     }
 }

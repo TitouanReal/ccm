@@ -15,10 +15,10 @@ mod imp {
     #[derive(Debug, Default, glib::Properties)]
     #[properties(wrapper_type = super::Collection)]
     pub struct Collection {
-        #[property(get, set, construct_only)]
+        #[property(get, construct_only)]
         manager: OnceCell<Manager>,
         #[property(get, construct_only)]
-        uri: RefCell<String>,
+        uri: OnceCell<String>,
         #[property(get, set)]
         name: RefCell<String>,
         #[property(get)]

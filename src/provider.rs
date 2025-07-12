@@ -6,7 +6,7 @@ use gtk::{
     glib::{self, Object},
 };
 
-use crate::Collection;
+use crate::{Collection, Manager};
 
 mod imp {
     use super::*;
@@ -14,6 +14,10 @@ mod imp {
     #[derive(Debug, Default, glib::Properties)]
     #[properties(wrapper_type = super::Provider)]
     pub struct Provider {
+        #[property(get, construct_only)]
+        manager: OnceCell<Manager>,
+        #[property(get, construct_only)]
+        uri: OnceCell<String>,
         #[property(get, set)]
         name: RefCell<String>,
         #[property(get)]
@@ -51,8 +55,12 @@ glib::wrapper! {
 
 impl Provider {
     /// Create a provider resource from its properties.
-    pub(crate) fn new(name: &str) -> Self {
-        glib::Object::builder().property("name", name).build()
+    pub(crate) fn new(manager: &Manager, uri: &str, name: &str) -> Self {
+        glib::Object::builder()
+            .property("manager", manager)
+            .property("uri", uri)
+            .property("name", name)
+            .build()
     }
 
     pub(crate) fn add_collection(&self, collection: &Collection) {

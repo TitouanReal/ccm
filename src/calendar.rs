@@ -19,10 +19,10 @@ mod imp {
     #[derive(Debug, Default, glib::Properties)]
     #[properties(wrapper_type = super::Calendar)]
     pub struct Calendar {
-        #[property(get, set, construct_only)]
+        #[property(get, construct_only)]
         manager: OnceCell<Manager>,
         #[property(get, construct_only)]
-        uri: RefCell<String>,
+        uri: OnceCell<String>,
         #[property(get, set, explicit_notify)]
         name: RefCell<String>,
         // TODO: Remove the Option

@@ -253,7 +253,7 @@ mod imp {
                     None
                 }
             }) {
-                let provider = Provider::new(&pre_provider.name);
+                let provider = Provider::new(&self.obj(), &pre_provider.uri, &pre_provider.name);
                 let provider_uri = pre_provider.uri.clone();
                 resource_pool.insert(provider_uri, Resource::Provider(provider));
 
@@ -335,7 +335,7 @@ mod imp {
                 let calendar_uri = pre_event.calendar_uri.clone();
 
                 if let Some(Resource::Calendar(calendar)) = resource_pool.get(&calendar_uri) {
-                    let event = Event::new(&pre_event.name);
+                    let event = Event::new(&self.obj(), &pre_event.uri, &pre_event.name);
                     calendar.add_event(&event);
                     resource_pool.insert(event_uri, Resource::Event(event));
 
