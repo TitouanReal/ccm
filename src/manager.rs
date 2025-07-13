@@ -27,9 +27,9 @@ mod imp {
         read_connection: OnceCell<SparqlConnection>,
         write_connection: OnceCell<DBusProxy>,
         notifier: OnceCell<Notifier>,
+        resource_pool: OnceCell<Mutex<HashMap<String, Resource>>>,
         #[property(get)]
         collections_model: OnceCell<CollectionsModel>,
-        resource_pool: OnceCell<Mutex<HashMap<String, Resource>>>,
         events_handler: RefCell<Option<glib::SignalHandlerId>>,
     }
 
@@ -75,7 +75,7 @@ mod imp {
                 #[weak(rename_to = imp)]
                 self,
                 async move {
-                    imp.refresh_resources();
+                    imp.retrieve_resources();
                 }
             ));
 
@@ -111,6 +111,7 @@ mod imp {
             self.notifier.get().expect("notifier should be initialized")
         }
 
+        // TODO: Do not lock the mutex here
         pub(super) fn resource_pool(&self) -> MutexGuard<'_, HashMap<String, Resource>> {
             self.resource_pool
                 .get()
@@ -119,84 +120,156 @@ mod imp {
                 .unwrap()
         }
 
-        fn refresh_resources(&self) {
-            let collection_cursor = match self.read_connection().query(
-                "SELECT ?collection ?collection_name
-                WHERE {
-                    ?collection a ccm:Collection;
-                        rdfs:label ?collection_name.
-                }",
-                None::<&gio::Cancellable>,
-            ) {
-                Ok(cursor) => cursor,
-                Err(e) => {
-                    warn!("Failed to execute query: {e}");
-                    return;
-                }
-            };
+        fn retrieve_resources(&self) {
+            self.retrieve_providers();
+            self.retrieve_collections();
+            self.retrieve_calendars();
+            self.retrieve_events();
+        }
 
-            while let Ok(true) = collection_cursor.next(None::<&gio::Cancellable>) {
-                let collection_uri = collection_cursor.string(0).unwrap();
-                let collection_name = collection_cursor.string(1).unwrap();
-                let collection = Collection::new(&self.obj(), &collection_uri, &collection_name);
+        fn retrieve_providers(&self) {
+            let cursor = self
+                .read_connection()
+                .query(
+                    "SELECT ?uri ?name
+                    WHERE {
+                        ?uri a ccm:Provider ;
+                            rdfs:label ?name .
+                    }",
+                    None::<&gio::Cancellable>,
+                )
+                .expect("Failed to retrieve providers");
 
-                let maybe_old_resource = self.resource_pool().insert(
-                    collection_uri.to_string(),
-                    Resource::Collection(collection.clone()),
-                );
-                // URIs are unique. This should not happen.
-                if maybe_old_resource.is_some() {
-                    warn!("Encountered a duplicate URI \"{collection_uri}\"");
-                }
-                self.obj().collections_model().append(&collection);
+            while let Ok(true) = cursor.next(None::<&gio::Cancellable>) {
+                let uri = cursor.string(0).expect("Query should return a URI");
+                let name = cursor.string(1).expect("Query should return a name");
+                let provider = Provider::new(&self.obj(), &uri, &name);
 
-                info!("Found collection: uri: \"{collection_uri}\", name: \"{collection_name}\"");
+                self.resource_pool()
+                    .insert(uri.to_string(), Resource::Provider(provider));
 
-                let statement = self
-                    .read_connection()
-                    .query_statement(
-                        "SELECT ?calendar ?calendar_color ?calendar_name
-                        WHERE {
-                            ?calendar a ccm:Calendar ;
-                                rdfs:label ?calendar_name ;
-                                ccm:color ?calendar_color ;
-                                ccm:collection ~collection_uri.
-                        }",
-                        None::<&gio::Cancellable>,
-                    )
-                    .unwrap()
-                    .unwrap();
-                statement.bind_string("collection_uri", &collection_uri);
+                info!("Found provider: uri: \"{uri}\", name: \"{name}\"");
+            }
+        }
 
-                let calendar_cursor = match statement.execute(None::<&gio::Cancellable>) {
-                    Ok(cursor) => cursor,
-                    Err(e) => {
-                        warn!("Failed to execute query: {}", e);
-                        continue;
-                    }
+        fn retrieve_collections(&self) {
+            let cursor = self
+                .read_connection()
+                .query(
+                    "SELECT ?uri ?provider_uri ?name
+                    WHERE {
+                        ?uri a ccm:Collection ;
+                            ccm:provider ?provider_uri ;
+                            rdfs:label ?name .
+                    }",
+                    None::<&gio::Cancellable>,
+                )
+                .expect("Failed to retrieve collections");
+
+            while let Ok(true) = cursor.next(None::<&gio::Cancellable>) {
+                let uri = cursor.string(0).expect("Query should return a URI");
+                let provider_uri = cursor
+                    .string(1)
+                    .expect("Query should return a provider URI");
+                let name = cursor.string(2).expect("Query should return a name");
+                let collection = Collection::new(&self.obj(), &uri, &name);
+
+                let Some(Resource::Provider(provider)) =
+                    self.resource_pool().get(&provider_uri.to_string()).cloned()
+                else {
+                    warn!("Collection \"{uri}\" has an invalid provider \"{provider_uri}\"");
+                    continue;
                 };
 
-                while let Ok(true) = calendar_cursor.next(None::<&gio::Cancellable>) {
-                    let calendar_uri = calendar_cursor.string(0).unwrap();
-                    let calendar_color = match calendar_cursor.string(1).unwrap().parse() {
-                        Ok(color) => color,
-                        Err(e) => {
-                            warn!("Failed to parse calendar color: {}", e);
-                            continue;
-                        }
-                    };
-                    let calendar_name = calendar_cursor.string(2).unwrap();
+                provider.add_collection(&collection);
+                self.obj().collections_model().append(&collection);
+                self.resource_pool()
+                    .insert(uri.to_string(), Resource::Collection(collection));
 
-                    let calendar =
-                        Calendar::new(&self.obj(), &calendar_uri, &calendar_name, calendar_color);
-                    self.resource_pool().insert(
-                        calendar_uri.to_string(),
-                        Resource::Calendar(calendar.clone()),
-                    );
-                    collection.add_calendar(&calendar);
+                info!("Found collection: uri: \"{uri}\", name: \"{name}\"");
+            }
+        }
 
-                    info!("Found calendar: uri: \"{calendar_uri}\", name: \"{calendar_name}\"");
-                }
+        fn retrieve_calendars(&self) {
+            let cursor = self
+                .read_connection()
+                .query(
+                    "SELECT ?uri ?collection_uri ?name ?color
+                    WHERE {
+                        ?uri a ccm:Calendar ;
+                            ccm:collection ?collection_uri ;
+                            rdfs:label ?name ;
+                            ccm:color ?color .
+                    }",
+                    None::<&gio::Cancellable>,
+                )
+                .expect("Failed to retrieve calendars");
+
+            while let Ok(true) = cursor.next(None::<&gio::Cancellable>) {
+                let uri = cursor.string(0).expect("Query should return a URI");
+                let collection_uri = cursor
+                    .string(1)
+                    .expect("Query should return a collection URI");
+                let name = cursor.string(2).expect("Query should return a name");
+                let color = cursor.string(3).expect("Query should return a color");
+                let calendar = Calendar::new(
+                    &self.obj(),
+                    &uri,
+                    &name,
+                    color.parse().expect("Color should be a valid color string"),
+                );
+
+                let Some(Resource::Collection(collection)) = self
+                    .resource_pool()
+                    .get(&collection_uri.to_string())
+                    .cloned()
+                else {
+                    warn!("Calendar \"{uri}\" has an invalid collection \"{collection_uri}\"");
+                    continue;
+                };
+
+                collection.add_calendar(&calendar);
+                self.resource_pool()
+                    .insert(uri.to_string(), Resource::Calendar(calendar));
+
+                info!("Found calendar: uri: \"{uri}\", name: \"{name}\", color: \"{color}\"");
+            }
+        }
+
+        fn retrieve_events(&self) {
+            let cursor = self
+                .read_connection()
+                .query(
+                    "SELECT ?uri ?calendar_uri ?name
+                    WHERE {
+                        ?uri a ccm:Event ;
+                            ccm:calendar ?calendar_uri ;
+                            rdfs:label ?name.
+                    }",
+                    None::<&gio::Cancellable>,
+                )
+                .expect("Failed to retrieve events");
+
+            while let Ok(true) = cursor.next(None::<&gio::Cancellable>) {
+                let uri = cursor.string(0).expect("Query should return a URI");
+                let calendar_uri = cursor
+                    .string(1)
+                    .expect("Query should return a calendar URI");
+                let name = cursor.string(2).expect("Query should return a name");
+                let event = Event::new(&self.obj(), &uri, &name);
+
+                let Some(Resource::Calendar(calendar)) =
+                    self.resource_pool().get(&calendar_uri.to_string()).cloned()
+                else {
+                    warn!("Event \"{uri}\" has an invalid calendar \"{calendar_uri}\"");
+                    continue;
+                };
+
+                calendar.emit_new_event(&event);
+                self.resource_pool()
+                    .insert(uri.to_string(), Resource::Event(event));
+
+                info!("Found event: uri: \"{uri}\", name: \"{name}\"");
             }
         }
 
