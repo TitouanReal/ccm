@@ -569,13 +569,13 @@ impl Manager {
             .unwrap();
     }
 
-    pub(crate) fn create_event(&self, calendar_uri: &str, name: &str) {
+    pub(crate) fn create_event(&self, calendar_uri: &str, name: &str, description: &str) {
         // TODO: dispatch to relevant provider instead
         self.imp()
             .write_connection()
             .call_sync(
                 "CreateEvent",
-                Some(&(calendar_uri, name).to_variant()),
+                Some(&(calendar_uri, name, description).to_variant()),
                 DBusCallFlags::NONE,
                 -1,
                 None::<&gio::Cancellable>,
