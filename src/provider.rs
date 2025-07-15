@@ -55,7 +55,7 @@ glib::wrapper! {
 }
 
 impl Provider {
-    /// Create a provider resource from its properties.
+    /// Create a provider from its properties.
     pub(crate) fn new(manager: &Manager, uri: &str, name: &str) -> Self {
         glib::Object::builder()
             .property("manager", manager)
@@ -64,6 +64,7 @@ impl Provider {
             .build()
     }
 
+    /// Add a collection to this provider.
     pub(crate) fn add_collection(&self, collection: &Collection) {
         self.imp().collections().append(collection);
     }

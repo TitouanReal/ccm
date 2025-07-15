@@ -6,13 +6,13 @@ use std::{
 use gdk::{
     RGBA,
     gio::ListStore,
-    glib::{self, Object, closure_local, subclass::Signal},
+    glib::{self, Object, clone, closure_local, subclass::Signal},
     prelude::*,
     subclass::prelude::*,
 };
 use tracing::info;
 
-use crate::{Event, Manager};
+use crate::{Collection, Event, Manager};
 
 mod imp {
     use super::*;
@@ -22,6 +22,8 @@ mod imp {
     pub struct Calendar {
         #[property(get, construct_only)]
         manager: OnceCell<Manager>,
+        #[property(get, construct_only)]
+        collection: OnceCell<Collection>,
         #[property(get, construct_only)]
         uri: OnceCell<String>,
         #[property(get, set, explicit_notify)]
@@ -67,20 +69,31 @@ glib::wrapper! {
 }
 
 impl Calendar {
-    pub(crate) fn new(manager: &Manager, uri: &str, name: &str, color: gdk::RGBA) -> Self {
+    /// Create a calendar from its properties.
+    pub(crate) fn new(
+        manager: &Manager,
+        collection: &Collection,
+        uri: &str,
+        name: &str,
+        color: gdk::RGBA,
+    ) -> Self {
         glib::Object::builder()
             .property("manager", manager)
+            .property("collection", collection)
             .property("uri", uri)
             .property("name", name)
             .property("color", Some(color))
             .build()
     }
 
+    /// Ask the backend to update this calendar. Properties with a None value will be left
+    /// unchanged.
     pub fn update(&self, name: Option<&str>, color: Option<gdk::RGBA>) {
         // TODO: dispatch to relevant provider instead
         self.manager().update_calendar(&self.uri(), name, color);
     }
 
+    /// TODO
     pub(crate) fn emit_updated(&self, name: &str, color: gdk::RGBA) {
         let uri = self.uri();
         if name != self.name() {
@@ -95,7 +108,7 @@ impl Calendar {
         }
     }
 
-    /// Deletes the calendar from the database.
+    /// Ask the backend to delete this calendar.
     pub fn delete(&self) {
         // TODO: dispatch to relevant provider instead
         self.manager().delete_calendar(&self.uri());
@@ -103,6 +116,12 @@ impl Calendar {
 
     /// Signal that this calendar was deleted.
     pub(super) fn emit_deleted(&self) {
+        for event in self.events().iter::<Event>() {
+            event
+                .expect("Model should not be mutated during iteration")
+                .emit_deleted();
+        }
+
         self.emit_by_name::<()>("deleted", &[]);
     }
 
@@ -117,12 +136,23 @@ impl Calendar {
         )
     }
 
+    /// Add an event to this calendar.
+    pub(crate) fn add_event(&self, event: &Event) {
+        self.imp().events().append(event);
+
+        event.connect_deleted(clone!(
+            #[weak(rename_to = obj)]
+            self,
+            move |event| {
+                let index = obj.events().find(event).expect("Event should be found");
+                obj.events().remove(index);
+            }
+        ));
+    }
+
+    /// Ask the backend to create a new event in this calendar.
     pub fn create_event(&self, name: &str, description: &str) {
         // TODO: dispatch to relevant provider instead
         self.manager().create_event(&self.uri(), name, description);
-    }
-
-    pub(crate) fn emit_new_event(&self, event: &Event) {
-        self.imp().events().append(event);
     }
 }

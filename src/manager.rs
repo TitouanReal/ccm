@@ -172,7 +172,6 @@ mod imp {
                     .string(1)
                     .expect("Query should return a provider URI");
                 let name = cursor.string(2).expect("Query should return a name");
-                let collection = Collection::new(&self.obj(), &uri, &name);
 
                 let Some(Resource::Provider(provider)) =
                     self.resource_pool().get(provider_uri.as_str()).cloned()
@@ -180,6 +179,8 @@ mod imp {
                     warn!("Collection \"{uri}\" has an invalid provider \"{provider_uri}\"");
                     continue;
                 };
+
+                let collection = Collection::new(&self.obj(), &provider, &uri, &name);
 
                 provider.add_collection(&collection);
                 self.obj().collections_model().append(&collection);
@@ -212,12 +213,6 @@ mod imp {
                     .expect("Query should return a collection URI");
                 let name = cursor.string(2).expect("Query should return a name");
                 let color = cursor.string(3).expect("Query should return a color");
-                let calendar = Calendar::new(
-                    &self.obj(),
-                    &uri,
-                    &name,
-                    color.parse().expect("Color should be a valid color string"),
-                );
 
                 let Some(Resource::Collection(collection)) =
                     self.resource_pool().get(collection_uri.as_str()).cloned()
@@ -225,6 +220,14 @@ mod imp {
                     warn!("Calendar \"{uri}\" has an invalid collection \"{collection_uri}\"");
                     continue;
                 };
+
+                let calendar = Calendar::new(
+                    &self.obj(),
+                    &collection,
+                    &uri,
+                    &name,
+                    color.parse().expect("Color should be a valid color string"),
+                );
 
                 collection.add_calendar(&calendar);
                 self.resource_pool()
@@ -256,7 +259,6 @@ mod imp {
                     .expect("Query should return a calendar URI");
                 let name = cursor.string(2).expect("Query should return a name");
                 let description = cursor.string(3).expect("Query should return a description");
-                let event = Event::new(&self.obj(), &uri, &name, &description);
 
                 let Some(Resource::Calendar(calendar)) =
                     self.resource_pool().get(calendar_uri.as_str()).cloned()
@@ -265,7 +267,9 @@ mod imp {
                     continue;
                 };
 
-                calendar.emit_new_event(&event);
+                let event = Event::new(&self.obj(), &calendar, &uri, &name, &description);
+
+                calendar.add_event(&event);
                 self.resource_pool()
                     .insert(uri.to_string(), Resource::Event(event));
 
@@ -350,8 +354,12 @@ mod imp {
                 let provider_uri = pre_collection.provider_uri.clone();
 
                 if let Some(Resource::Provider(provider)) = resource_pool.get(&provider_uri) {
-                    let collection =
-                        Collection::new(&self.obj(), &pre_collection.uri, &pre_collection.name);
+                    let collection = Collection::new(
+                        &self.obj(),
+                        provider,
+                        &pre_collection.uri,
+                        &pre_collection.name,
+                    );
                     provider.add_collection(&collection);
                     resource_pool.insert(collection_uri, Resource::Collection(collection));
 
@@ -380,6 +388,7 @@ mod imp {
                 if let Some(Resource::Collection(collection)) = resource_pool.get(&collection_uri) {
                     let calendar = Calendar::new(
                         &self.obj(),
+                        collection,
                         &pre_calendar.uri,
                         &pre_calendar.name,
                         pre_calendar.color,
@@ -412,11 +421,12 @@ mod imp {
                 if let Some(Resource::Calendar(calendar)) = resource_pool.get(&calendar_uri) {
                     let event = Event::new(
                         &self.obj(),
+                        calendar,
                         &pre_event.uri,
                         &pre_event.name,
                         &pre_event.description,
                     );
-                    calendar.emit_new_event(&event);
+                    calendar.add_event(&event);
                     resource_pool.insert(event_uri, Resource::Event(event));
 
                     info!(

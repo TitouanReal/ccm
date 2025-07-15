@@ -1,12 +1,15 @@
-use std::cell::{OnceCell, RefCell};
+use std::{
+    cell::{OnceCell, RefCell},
+    sync::LazyLock,
+};
 
 use gdk::{
-    glib::{self, Object},
+    glib::{self, Object, closure_local, subclass::Signal},
     prelude::*,
     subclass::prelude::*,
 };
 
-use crate::Manager;
+use crate::{Calendar, Manager};
 
 mod imp {
     use super::*;
@@ -16,6 +19,8 @@ mod imp {
     pub struct Event {
         #[property(get, construct_only)]
         manager: OnceCell<Manager>,
+        #[property(get, construct_only)]
+        calendar: OnceCell<Calendar>,
         #[property(get, construct_only)]
         uri: OnceCell<String>,
         #[property(get, set)]
@@ -32,7 +37,13 @@ mod imp {
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for Event {}
+    impl ObjectImpl for Event {
+        fn signals() -> &'static [Signal] {
+            static SIGNALS: LazyLock<Vec<Signal>> =
+                LazyLock::new(|| vec![Signal::builder("deleted").build()]);
+            SIGNALS.as_ref()
+        }
+    }
 }
 
 glib::wrapper! {
@@ -40,12 +51,36 @@ glib::wrapper! {
 }
 
 impl Event {
-    pub(crate) fn new(manager: &Manager, uri: &str, name: &str, description: &str) -> Self {
+    /// Create a new event from its properties.
+    pub(crate) fn new(
+        manager: &Manager,
+        calendar: &Calendar,
+        uri: &str,
+        name: &str,
+        description: &str,
+    ) -> Self {
         glib::Object::builder()
             .property("manager", manager)
+            .property("calendar", calendar)
             .property("uri", uri)
             .property("name", name)
             .property("description", description)
             .build()
+    }
+
+    /// Signal that this event was deleted.
+    pub(super) fn emit_deleted(&self) {
+        self.emit_by_name::<()>("deleted", &[]);
+    }
+
+    /// Connect to the signal emitted when this event is deleted.
+    pub fn connect_deleted<F: Fn(&Self) + 'static>(&self, f: F) -> glib::SignalHandlerId {
+        self.connect_closure(
+            "deleted",
+            true,
+            closure_local!(|obj: Self| {
+                f(&obj);
+            }),
+        )
     }
 }

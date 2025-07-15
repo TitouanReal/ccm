@@ -8,7 +8,7 @@ use gdk::{
     subclass::prelude::*,
 };
 
-use crate::{Calendar, Manager};
+use crate::{Calendar, Manager, Provider};
 
 mod imp {
     use super::*;
@@ -18,6 +18,8 @@ mod imp {
     pub struct Collection {
         #[property(get, construct_only)]
         manager: OnceCell<Manager>,
+        #[property(get, construct_only)]
+        provider: OnceCell<Provider>,
         #[property(get, construct_only)]
         uri: OnceCell<String>,
         #[property(get, set)]
@@ -70,14 +72,17 @@ glib::wrapper! {
 }
 
 impl Collection {
-    pub(crate) fn new(manager: &Manager, uri: &str, name: &str) -> Self {
+    /// Create a collection from its properties.
+    pub(crate) fn new(manager: &Manager, provider: &Provider, uri: &str, name: &str) -> Self {
         glib::Object::builder()
             .property("manager", manager)
+            .property("provider", provider)
             .property("uri", uri)
             .property("name", name)
             .build()
     }
 
+    /// Add a calendar to this collection.
     pub(crate) fn add_calendar(&self, calendar: &Calendar) {
         self.imp().calendars().append(calendar);
 
@@ -94,6 +99,7 @@ impl Collection {
         ));
     }
 
+    /// Ask the backend to create a new calendar in this collection.
     pub fn create_calendar(&self, name: &str, color: RGBA) {
         // TODO: dispatch to relevant provider instead
         self.manager().create_calendar(&self.uri(), name, color);
