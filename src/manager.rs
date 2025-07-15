@@ -240,11 +240,12 @@ mod imp {
             let cursor = self
                 .read_connection()
                 .query(
-                    "SELECT ?uri ?calendar_uri ?name
+                    "SELECT ?uri ?calendar_uri ?name ?description
                     WHERE {
                         ?uri a ccm:Event ;
                             ccm:calendar ?calendar_uri ;
-                            ccm:eventName ?name.
+                            ccm:eventName ?name ;
+                            ccm:eventDescription ?description .
                     }",
                     None::<&gio::Cancellable>,
                 )
@@ -256,7 +257,8 @@ mod imp {
                     .string(1)
                     .expect("Query should return a calendar URI");
                 let name = cursor.string(2).expect("Query should return a name");
-                let event = Event::new(&self.obj(), &uri, &name);
+                let description = cursor.string(3).expect("Query should return a description");
+                let event = Event::new(&self.obj(), &uri, &name, &description);
 
                 let Some(Resource::Calendar(calendar)) =
                     self.resource_pool().get(&calendar_uri.to_string()).cloned()
@@ -269,7 +271,9 @@ mod imp {
                 self.resource_pool()
                     .insert(uri.to_string(), Resource::Event(event));
 
-                info!("Found event: uri: \"{uri}\", name: \"{name}\"");
+                info!(
+                    "Found event: uri: \"{uri}\", name: \"{name}\", description: \"{description}\""
+                );
             }
         }
 
@@ -408,7 +412,12 @@ mod imp {
                 let calendar_uri = pre_event.calendar_uri.clone();
 
                 if let Some(Resource::Calendar(calendar)) = resource_pool.get(&calendar_uri) {
-                    let event = Event::new(&self.obj(), &pre_event.uri, &pre_event.name);
+                    let event = Event::new(
+                        &self.obj(),
+                        &pre_event.uri,
+                        &pre_event.name,
+                        &pre_event.description,
+                    );
                     calendar.emit_new_event(&event);
                     resource_pool.insert(event_uri, Resource::Event(event));
 

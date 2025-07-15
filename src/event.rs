@@ -17,6 +17,8 @@ mod imp {
         uri: OnceCell<String>,
         #[property(get, set)]
         name: RefCell<String>,
+        #[property(get, set)]
+        description: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -35,11 +37,12 @@ glib::wrapper! {
 }
 
 impl Event {
-    pub(crate) fn new(manager: &Manager, uri: &str, name: &str) -> Self {
+    pub(crate) fn new(manager: &Manager, uri: &str, name: &str, description: &str) -> Self {
         glib::Object::builder()
             .property("manager", manager)
             .property("uri", uri)
             .property("name", name)
+            .property("description", description)
             .build()
     }
 }

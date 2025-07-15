@@ -4,6 +4,7 @@ pub struct PreEvent {
     pub uri: String,
     pub calendar_uri: String,
     pub name: String,
+    pub description: String,
 }
 
 impl PreEvent {
