@@ -584,6 +584,10 @@ impl Manager {
     }
 
     pub fn search_events(&self, query: &str) -> ListStore {
+        if query.is_empty() {
+            return ListStore::new::<Event>();
+        }
+
         let statement = self
             .imp()
             .read_connection()
