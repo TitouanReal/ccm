@@ -3,11 +3,12 @@ use std::{
     sync::LazyLock,
 };
 
-use adw::{prelude::*, subclass::prelude::*};
-use gtk::{
-    gdk::{self, RGBA},
+use gdk::{
+    RGBA,
     gio::ListStore,
     glib::{self, Object, closure_local, subclass::Signal},
+    prelude::*,
+    subclass::prelude::*,
 };
 use tracing::info;
 

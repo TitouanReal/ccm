@@ -1,9 +1,10 @@
 use std::cell::{OnceCell, RefCell};
 
-use adw::{prelude::*, subclass::prelude::*};
-use gtk::{
+use gdk::{
     gio::ListStore,
     glib::{self, Object},
+    prelude::*,
+    subclass::prelude::*,
 };
 
 use crate::{Collection, Manager};

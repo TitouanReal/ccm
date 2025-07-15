@@ -1,7 +1,10 @@
 use std::cell::{OnceCell, RefCell};
 
-use adw::{prelude::*, subclass::prelude::*};
-use gtk::glib::{self, Object};
+use gdk::{
+    glib::{self, Object},
+    prelude::*,
+    subclass::prelude::*,
+};
 
 use crate::Manager;
 

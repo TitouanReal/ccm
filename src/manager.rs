@@ -4,11 +4,12 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-use adw::subclass::prelude::*;
-use gtk::{
-    gdk::RGBA,
-    gio::{self, BusType, DBusCallFlags, DBusProxy, DBusProxyFlags, prelude::*},
+use gdk::{
+    RGBA,
+    gio::{self, BusType, DBusCallFlags, DBusProxy, DBusProxyFlags, ListStore},
     glib::{self, Object, clone},
+    prelude::*,
+    subclass::prelude::*,
 };
 use tracing::{debug, info, warn};
 use tsparql::{Notifier, NotifierEvent, NotifierEventType, SparqlConnection, prelude::*};
@@ -93,9 +94,8 @@ mod imp {
         }
     }
 
-    #[gtk::template_callbacks]
     impl Manager {
-        fn read_connection(&self) -> &SparqlConnection {
+        pub(super) fn read_connection(&self) -> &SparqlConnection {
             self.read_connection
                 .get()
                 .expect("read connection should be initialized")
@@ -175,7 +175,7 @@ mod imp {
                 let collection = Collection::new(&self.obj(), &uri, &name);
 
                 let Some(Resource::Provider(provider)) =
-                    self.resource_pool().get(&provider_uri.to_string()).cloned()
+                    self.resource_pool().get(provider_uri.as_str()).cloned()
                 else {
                     warn!("Collection \"{uri}\" has an invalid provider \"{provider_uri}\"");
                     continue;
@@ -219,10 +219,8 @@ mod imp {
                     color.parse().expect("Color should be a valid color string"),
                 );
 
-                let Some(Resource::Collection(collection)) = self
-                    .resource_pool()
-                    .get(&collection_uri.to_string())
-                    .cloned()
+                let Some(Resource::Collection(collection)) =
+                    self.resource_pool().get(collection_uri.as_str()).cloned()
                 else {
                     warn!("Calendar \"{uri}\" has an invalid collection \"{collection_uri}\"");
                     continue;
@@ -261,7 +259,7 @@ mod imp {
                 let event = Event::new(&self.obj(), &uri, &name, &description);
 
                 let Some(Resource::Calendar(calendar)) =
-                    self.resource_pool().get(&calendar_uri.to_string()).cloned()
+                    self.resource_pool().get(calendar_uri.as_str()).cloned()
                 else {
                     warn!("Event \"{uri}\" has an invalid calendar \"{calendar_uri}\"");
                     continue;
@@ -583,6 +581,48 @@ impl Manager {
                 None::<&gio::Cancellable>,
             )
             .unwrap();
+    }
+
+    pub fn search_events(&self, query: &str) -> ListStore {
+        let statement = self
+            .imp()
+            .read_connection()
+            .query_statement(
+                "SELECT ?uri
+                WHERE {
+                    ?uri a ccm:Event ;
+                        fts:match ~query .
+                }",
+                None::<&gio::Cancellable>,
+            )
+            .expect("SPARQL should be valid")
+            .expect("SPARQL should be valid");
+        statement.bind_string("query", query);
+
+        let cursor = match statement.execute(None::<&gio::Cancellable>) {
+            Ok(cursor) => cursor,
+            Err(err) => {
+                warn!("Failed to search events: {err:?}");
+                return ListStore::new::<Event>();
+            }
+        };
+
+        let search_results = ListStore::new::<Event>();
+
+        while let Ok(true) = cursor.next(None::<&gio::Cancellable>) {
+            let uri = cursor.string(0).expect("Query should return a URI");
+
+            let Some(Resource::Event(event)) =
+                self.imp().resource_pool().get(uri.as_str()).cloned()
+            else {
+                warn!("Event \"{uri}\" is not in resource pool");
+                continue;
+            };
+
+            search_results.append(&event);
+        }
+
+        search_results
     }
 }
 

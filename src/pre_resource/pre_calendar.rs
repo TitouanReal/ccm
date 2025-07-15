@@ -1,4 +1,4 @@
-use gtk::{gdk::RGBA, gio};
+use gdk::{RGBA, gio};
 use tracing::error;
 use tsparql::{SparqlConnection, prelude::*};
 
@@ -19,12 +19,12 @@ impl PreCalendar {
         let statement = read_connection
             .query_statement(
                 "SELECT ?name ?color ?collection
-            WHERE {
-                ~uri a ccm:Calendar ;
-                    ccm:collection ?collection ;
-                    ccm:calendarName ?name ;
-                    ccm:color ?color .
-            }",
+                WHERE {
+                    ~uri a ccm:Calendar ;
+                        ccm:collection ?collection ;
+                        ccm:calendarName ?name ;
+                        ccm:color ?color .
+                }",
                 None::<&gio::Cancellable>,
             )
             .expect("SPARQL should be valid")

@@ -1,10 +1,11 @@
 use std::cell::{OnceCell, RefCell};
 
-use adw::{prelude::*, subclass::prelude::*};
-use gtk::{
-    gdk::RGBA,
+use gdk::{
+    RGBA,
     gio::{self, ListStore},
     glib::{self, Object, clone},
+    prelude::*,
+    subclass::prelude::*,
 };
 
 use crate::{Calendar, Manager};

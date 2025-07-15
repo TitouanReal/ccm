@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use gtk::{gio, glib, prelude::*, subclass::prelude::*};
+use gdk::{gio, glib, prelude::*, subclass::prelude::*};
 
 use super::collection::Collection;
 

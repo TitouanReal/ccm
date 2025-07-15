@@ -1,4 +1,4 @@
-use gtk::gio;
+use gdk::gio;
 use tracing::error;
 use tsparql::SparqlConnection;
 
