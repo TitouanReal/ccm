@@ -134,7 +134,7 @@ mod imp {
                     "SELECT ?uri ?name
                     WHERE {
                         ?uri a ccm:Provider ;
-                            rdfs:label ?name .
+                            ccm:providerName ?name .
                     }",
                     None::<&gio::Cancellable>,
                 )
@@ -160,7 +160,7 @@ mod imp {
                     WHERE {
                         ?uri a ccm:Collection ;
                             ccm:provider ?provider_uri ;
-                            rdfs:label ?name .
+                            ccm:collectionName ?name .
                     }",
                     None::<&gio::Cancellable>,
                 )
@@ -198,7 +198,7 @@ mod imp {
                     WHERE {
                         ?uri a ccm:Calendar ;
                             ccm:collection ?collection_uri ;
-                            rdfs:label ?name ;
+                            ccm:calendarName ?name ;
                             ccm:color ?color .
                     }",
                     None::<&gio::Cancellable>,
@@ -244,7 +244,7 @@ mod imp {
                     WHERE {
                         ?uri a ccm:Event ;
                             ccm:calendar ?calendar_uri ;
-                            rdfs:label ?name.
+                            ccm:eventName ?name.
                     }",
                     None::<&gio::Cancellable>,
                 )
