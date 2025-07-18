@@ -9,9 +9,10 @@ use gdk::{
     subclass::prelude::*,
 };
 
-use crate::{Calendar, Manager};
+use crate::{Calendar, Manager, TimeFrame};
 
 mod imp {
+
     use super::*;
 
     #[derive(Debug, Default, glib::Properties)]
@@ -27,6 +28,8 @@ mod imp {
         name: RefCell<String>,
         #[property(get, set)]
         description: RefCell<String>,
+        #[property(get, set)]
+        time_frame: RefCell<Option<TimeFrame>>,
     }
 
     #[glib::object_subclass]
@@ -58,6 +61,7 @@ impl Event {
         uri: &str,
         name: &str,
         description: &str,
+        time_frame: &TimeFrame,
     ) -> Self {
         glib::Object::builder()
             .property("manager", manager)
@@ -65,6 +69,7 @@ impl Event {
             .property("uri", uri)
             .property("name", name)
             .property("description", description)
+            .property("time_frame", time_frame)
             .build()
     }
 

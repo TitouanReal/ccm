@@ -7,6 +7,8 @@ pub struct PreEvent {
     pub calendar_uri: String,
     pub name: String,
     pub description: String,
+    pub start: String,
+    pub end: String,
 }
 
 impl PreEvent {
@@ -18,12 +20,14 @@ impl PreEvent {
     pub fn from_uri(read_connection: &SparqlConnection, uri: &str) -> Result<Self, ()> {
         let statement = read_connection
             .query_statement(
-                "SELECT ?name ?description ?calendar
+                "SELECT ?name ?description ?calendar ?start ?end
                 WHERE {
                     ~uri a ccm:Event ;
                         ccm:calendar ?calendar ;
                         ccm:eventName ?name ;
-                        ccm:eventDescription ?description .
+                        ccm:eventDescription ?description  ;
+                        ccm:eventStart ?start ;
+                        ccm:eventEnd ?end .
                 }",
                 None::<&gio::Cancellable>,
             )
@@ -41,18 +45,33 @@ impl PreEvent {
 
         match cursor.next(None::<&gio::Cancellable>) {
             Ok(true) => {
-                let event_name = cursor.string(0).expect("Query should return an event name");
+                let name = cursor
+                    .string(0)
+                    .expect("Query should return an event name")
+                    .to_string();
                 let description = cursor
                     .string(1)
-                    .expect("Query should return an event description");
+                    .expect("Query should return an event description")
+                    .to_string();
                 let calendar_uri = cursor
                     .string(2)
-                    .expect("Query should return a calendar URI");
+                    .expect("Query should return a calendar URI")
+                    .to_string();
+                let start = cursor
+                    .string(3)
+                    .expect("Query should return a calendar URI")
+                    .to_string();
+                let end = cursor
+                    .string(4)
+                    .expect("Query should return a calendar URI")
+                    .to_string();
                 let calendar = Self {
                     uri: uri.to_string(),
-                    calendar_uri: calendar_uri.to_string(),
-                    name: event_name.to_string(),
-                    description: description.to_string(),
+                    calendar_uri,
+                    name,
+                    description,
+                    start,
+                    end,
                 };
 
                 Ok(calendar)
