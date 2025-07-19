@@ -15,13 +15,11 @@ use tracing::{debug, info, warn};
 use tsparql::{Notifier, NotifierEvent, NotifierEventType, SparqlConnection, prelude::*};
 
 use crate::{
-    Calendar, Collection, Event, Instant, Provider, Resource, TimeFrame,
-    collections_model::CollectionsModel, pre_resource::PreResource, spawn,
+    Calendar, Collection, CollectionsModel, Event, Provider, Resource, Timeframe, Zoned,
+    pre_resource::PreResource, spawn,
 };
 
 mod imp {
-    use crate::InstantInner;
-
     use super::*;
 
     #[derive(Debug, Default, glib::Properties)]
@@ -243,12 +241,15 @@ mod imp {
             let cursor = self
                 .read_connection()
                 .query(
-                    "SELECT ?uri ?calendar_uri ?name ?description ?start ?end
+                    "SELECT ?uri ?calendar_uri ?name ?description ?all_day ?start ?end
                     WHERE {
                         ?uri a ccm:Event ;
                             ccm:calendar ?calendar_uri ;
                             ccm:eventName ?name ;
-                            ccm:eventDescription ?description .
+                            ccm:eventDescription ?description ;
+                            ccm:eventAllDay ?all_day ;
+                            ccm:eventStart ?start ;
+                            ccm:eventEnd ?end .
                     }",
                     None::<&gio::Cancellable>,
                 )
@@ -261,34 +262,31 @@ mod imp {
                     .expect("Query should return a calendar URI");
                 let name = cursor.string(2).expect("Query should return a name");
                 let description = cursor.string(3).expect("Query should return a description");
-                // let start_str = cursor.string(4).expect("Query should return a start date");
-                // let end_str = cursor.string(5).expect("Query should return an end date");
+                let all_day = cursor.is_boolean(4);
+                let start_str = cursor.string(5).expect("Query should return a start date");
+                let end_str = cursor.string(6).expect("Query should return an end date");
 
-                // let start = start_str
-                //     .parse::<Instant>()
-                //     .expect("Event \"{uri}\" has an invalid start date");
-                // let end = end_str
-                //     .parse::<Instant>()
-                //     .expect("Event \"{uri}\" has an invalid end date");
+                let timeframe = if all_day {
+                    let start = start_str
+                        .parse::<jiff::civil::Date>()
+                        .expect("Event \"{uri}\" has an invalid start date")
+                        .into();
+                    let end = end_str
+                        .parse::<jiff::civil::Date>()
+                        .expect("Event \"{uri}\" has an invalid end date")
+                        .into();
 
-                // let time_frame = match (start, end) {
-                //     (
-                //         Instant(InstantInner::Zoned(start_zoned)),
-                //         Instant(InstantInner::Zoned(end_zoned)),
-                //     ) if start_zoned >= end_zoned => {
-                //         TimeFrame::new_zoned(false, start_zoned, end_zoned)
-                //     }
-                //     (
-                //         Instant(InstantInner::Date(start_date)),
-                //         Instant(InstantInner::Date(end_date)),
-                //     ) if start_date >= end_date => TimeFrame::new_date(false, start_date, end_date),
-                //     _ => {
-                //         warn!("Event \"{uri}\" has invalid dates: {start_str} - {end_str}");
-                //         continue;
-                //     }
-                // };
+                    Timeframe::new(true, start, end)
+                } else {
+                    let start = start_str
+                        .parse::<Zoned>()
+                        .expect("Event \"{uri}\" has an invalid start date");
+                    let end = end_str
+                        .parse::<Zoned>()
+                        .expect("Event \"{uri}\" has an invalid end date");
 
-                let time_frame = TimeFrame::default();
+                    Timeframe::new(true, start, end)
+                };
 
                 let Some(Resource::Calendar(calendar)) =
                     self.resource_pool().get(calendar_uri.as_str()).cloned()
@@ -303,7 +301,7 @@ mod imp {
                     &uri,
                     &name,
                     &description,
-                    &time_frame,
+                    &timeframe,
                 );
 
                 calendar.add_event(&event);
@@ -457,28 +455,27 @@ mod imp {
 
                 let start_str = &pre_event.start;
                 let end_str = &pre_event.end;
-                let start = start_str
-                    .parse::<Instant>()
-                    .expect("Event \"{uri}\" has an invalid start date");
-                let end = end_str
-                    .parse::<Instant>()
-                    .expect("Event \"{uri}\" has an invalid end date");
 
-                let time_frame = match (start, end) {
-                    (
-                        Instant(InstantInner::Zoned(start_zoned)),
-                        Instant(InstantInner::Zoned(end_zoned)),
-                    ) if start_zoned >= end_zoned => {
-                        TimeFrame::new_zoned(false, start_zoned, end_zoned)
-                    }
-                    (
-                        Instant(InstantInner::Date(start_date)),
-                        Instant(InstantInner::Date(end_date)),
-                    ) if start_date >= end_date => TimeFrame::new_date(false, start_date, end_date),
-                    _ => {
-                        warn!("Event \"{event_uri}\" has invalid dates: {start_str} - {end_str}");
-                        continue;
-                    }
+                let timeframe = if pre_event.all_day {
+                    let start = start_str
+                        .parse::<jiff::civil::Date>()
+                        .expect("Event \"{uri}\" has an invalid start date")
+                        .into();
+                    let end = end_str
+                        .parse::<jiff::civil::Date>()
+                        .expect("Event \"{uri}\" has an invalid end date")
+                        .into();
+
+                    Timeframe::new(true, start, end)
+                } else {
+                    let start = start_str
+                        .parse::<Zoned>()
+                        .expect("Event \"{uri}\" has an invalid start date");
+                    let end = end_str
+                        .parse::<Zoned>()
+                        .expect("Event \"{uri}\" has an invalid end date");
+
+                    Timeframe::new(true, start, end)
                 };
 
                 if let Some(Resource::Calendar(calendar)) = resource_pool.get(&calendar_uri) {
@@ -488,7 +485,7 @@ mod imp {
                         &pre_event.uri,
                         &pre_event.name,
                         &pre_event.description,
-                        &time_frame,
+                        &timeframe,
                     );
                     calendar.add_event(&event);
                     resource_pool.insert(event_uri, Resource::Event(event));

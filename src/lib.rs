@@ -6,16 +6,17 @@ mod manager;
 mod pre_resource;
 mod provider;
 mod resource;
-mod time_frame;
+mod timeframe;
 mod utils;
 
 pub use calendar::*;
 pub use collection::*;
+pub use collections_model::*;
 pub use event::*;
 pub use manager::*;
 pub use provider::*;
 pub use resource::*;
-pub use time_frame::*;
+pub use timeframe::*;
 
 #[doc(no_inline)]
 pub use jiff;

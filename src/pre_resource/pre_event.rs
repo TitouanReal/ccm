@@ -7,6 +7,7 @@ pub struct PreEvent {
     pub calendar_uri: String,
     pub name: String,
     pub description: String,
+    pub all_day: bool,
     pub start: String,
     pub end: String,
 }
@@ -20,12 +21,13 @@ impl PreEvent {
     pub fn from_uri(read_connection: &SparqlConnection, uri: &str) -> Result<Self, ()> {
         let statement = read_connection
             .query_statement(
-                "SELECT ?name ?description ?calendar ?start ?end
+                "SELECT ?name ?description ?calendar ?all_day ?start ?end
                 WHERE {
                     ~uri a ccm:Event ;
                         ccm:calendar ?calendar ;
                         ccm:eventName ?name ;
                         ccm:eventDescription ?description  ;
+                        ccm:eventAllDay ?all_day ;
                         ccm:eventStart ?start ;
                         ccm:eventEnd ?end .
                 }",
@@ -57,12 +59,13 @@ impl PreEvent {
                     .string(2)
                     .expect("Query should return a calendar URI")
                     .to_string();
+                let all_day = cursor.is_boolean(3);
                 let start = cursor
-                    .string(3)
+                    .string(4)
                     .expect("Query should return a calendar URI")
                     .to_string();
                 let end = cursor
-                    .string(4)
+                    .string(5)
                     .expect("Query should return a calendar URI")
                     .to_string();
                 let calendar = Self {
@@ -70,6 +73,7 @@ impl PreEvent {
                     calendar_uri,
                     name,
                     description,
+                    all_day,
                     start,
                     end,
                 };
